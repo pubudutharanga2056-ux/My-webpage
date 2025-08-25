@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>QuickConvert — Advanced Audio Extractor</title>
+<link rel="preconnect" href="https://unpkg.com" />
+<link rel="icon" type="image/x-icon" href="arrow_13782286.icon">
+<style>
+  :root{
+    --bg:#0f1724; --panel:#0b1220; --accent1:#0ea5e9; --accent2:#2563eb; --muted:#98a0c7; --card:#0f1430;
+    --glass: rgba(255,255,255,0.03);
+  }
+  *{box-sizing:border-box}
+  body{font-family:Inter,ui-sans-serif,system-ui,Arial,sans-serif;background:linear-gradient(180deg,#071029,#0b0f24);color:#e6eef9;margin:0;padding:24px}
+  .wrap{max-width:1100px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+  .brand{display:flex;gap:12px;align-items:center}
+  .logo{background:linear-gradient(135deg,var(--accent1),var(--accent2));padding:8px 12px;border-radius:10px;font-weight:700;color:#031028}
+  h1{font-size:20px;margin:0}
+  .lead{color:var(--muted);font-size:13px}
+  .panel{background:linear-gradient(180deg,var(--panel),#07122a);border-radius:14px;padding:16px;margin-top:12px;border:1px solid rgba(255,255,255,0.03)}
+  .grid{display:grid;grid-template-columns:1fr 360px;gap:14px}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+  .drop{
+    border:2px dashed rgba(255,255,255,0.06);
+    border-radius:12px;padding:20px;min-height:180px;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;background:var(--glass)
+  }
+  .drop.drag{border-color:rgba(110,168,255,0.9);box-shadow:0 8px 30px rgba(16,24,56,0.6)}
+  input[type=file]{display:none}
+  .btn{background:linear-gradient(135deg,var(--accent2),var(--accent1));padding:10px 14px;border-radius:12px;border:none;color:#031028;font-weight:700;cursor:pointer}
+  select,input[type=number],input[type=text]{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .meta{font-size:13px;color:var(--muted)}
+  .progress{height:10px;background:rgba(255,255,255,0.04);border-radius:999px;overflow:hidden}
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent1),var(--accent2));width:0%}
+  .result{display:flex;flex-direction:column;gap:8px}
+  .small{font-size:12px;color:var(--muted)}
+  .wave{height:110px;border-radius:10px;overflow:hidden;background:#071233;padding:8px}
+  .footer-note{font-size:12px;color:var(--muted);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">QuickConvert</div>
+      <div>
+        <h1>Advanced Audio Extractor</h1>
+        <div class="lead">Upload a video, trim, choose format (MP3/WAV/AAC/FLAC) and extract audio — all in your browser.</div>
+      </div>
+    </div>
+    <div>
+      <button id="load-ffmpeg" class="btn">Load FFmpeg (required)</button>
+    </div>
+  </header>
+
+  <section class="panel grid">
+    <!-- Left: drop / settings -->
+    <div>
+      <div id="dropzone" class="drop">
+        <div id="drop-info">
+          <div style="font-weight:700">Drag & drop a video or click to choose</div>
+          <div class="meta">Supported: MP4, MKV, MOV, AVI, FLV, WEBM — large files allowed (browser memory limits apply).</div>
+        </div>
+
+        <input id="file-input" type="file" accept="video/*,audio/*" />
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="pick-btn" class="btn">Select File</button>
+          <button id="clear-btn" class="btn" style="background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)">Clear</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px" class="panel">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div style="flex:1">
+            <label class="small">Output format</label>
+            <select id="format">
+              <option value="mp3">MP3 (good smaller files)</option>
+              <option value="wav">WAV (lossless)</option>
+              <option value="aac">AAC (good quality)</option>
+              <option value="flac">FLAC (lossless compressed)</option>
+            </select>
+          </div>
+          <div style="width:120px">
+            <label class="small">Bitrate / Quality</label>
+            <select id="quality">
+              <option value="192k">192 kbps</option>
+              <option value="256k" selected>256 kbps</option>
+              <option value="320k">320 kbps</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="flex:1">
+            <label class="small">Trim start (seconds)</label>
+            <input id="start" type="number" min="0" step="0.1" placeholder="0" />
+          </div>
+          <div style="width:160px">
+            <label class="small">Trim end (seconds)</label>
+            <input id="end" type="number" min="0" step="0.1" placeholder="auto" />
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <button id="extract-btn" class="btn">Extract Audio</button>
+          <div style="flex:1">
+            <div class="small">Progress</div>
+            <div class="progress" aria-hidden><i id="prog"></i></div>
+          </div>
+        </div>
+
+        <div class="footer-note">Tip: For best performance, use modern Chromium-based browsers. Large files may be slow to process on low-memory devices.</div>
+      </div>
+    </div>
+
+    <!-- Right: preview / results -->
+    <aside>
+      <div class="panel result" id="info-panel">
+        <div><strong id="file-name">No file chosen</strong></div>
+        <div class="small" id="file-meta">File info will appear here</div>
+
+        <div style="margin-top:10px">
+          <div class="small">Preview</div>
+          <div class="wave" id="waveform">No preview</div>
+        </div>
+
+        <div style="margin-top:10px">
+          <audio id="audio-player" controls style="width:100%;display:none"></audio>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <a id="download-link" class="btn" style="display:none" download>Download</a>
+          <button id="play-btn" class="btn" style="display:none;background:linear-gradient(135deg,#334155,#0f1724)">Play Preview</button>
+        </div>
+
+        <div class="small" style="margin-top:8px;color:var(--muted)">
+          Loading FFmpeg may download ~10–20MB depending on cached assets. Close the page to cancel download.
+        </div>
+      </div>
+    </aside>
+  </section>
+</div>
+
+<!-- Libraries: ffmpeg.wasm and wavesurfer -->
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script src="https://unpkg.com/wavesurfer.js@6.2.0/dist/wavesurfer.min.js"></script>
+
+<script>
+(async ()=>{
+
+  const { createFFmpeg, fetchFile } = FFmpeg;
+  let ffmpeg = null;
+  let isFFmpegLoaded = false;
+  const loadBtn = document.getElementById('load-ffmpeg');
+  const pickBtn = document.getElementById('pick-btn');
+  const fileInput = document.getElementById('file-input');
+  const dropzone = document.getElementById('dropzone');
+  const clearBtn = document.getElementById('clear-btn');
+  const extractBtn = document.getElementById('extract-btn');
+  const progBar = document.getElementById('prog');
+  const fileNameEl = document.getElementById('file-name');
+  const fileMetaEl = document.getElementById('file-meta');
+  const formatEl = document.getElementById('format');
+  const qualityEl = document.getElementById('quality');
+  const startEl = document.getElementById('start');
+  const endEl = document.getElementById('end');
+  const downloadLink = document.getElementById('download-link');
+  const audioPlayer = document.getElementById('audio-player');
+  const playBtn = document.getElementById('play-btn');
+  const waveformContainer = document.getElementById('waveform');
+
+  let selectedFile = null;
+  let wavesurfer = null;
+  let lastBlobUrl = null;
+
+  // create wavesurfer
+  function initWave() {
+    if (wavesurfer) { wavesurfer.destroy(); wavesurfer = null; }
+    wavesurfer = WaveSurfer.create({
+      container: waveformContainer,
+      waveColor: '#2dd4bf',
+      progressColor: '#60a5fa',
+      height: 90,
+      cursorWidth: 1,
+      responsive: true
+    });
+  }
+  initWave();
+
+  function setProgress(p){
+    progBar.style.width = (p*100).toFixed(1) + '%';
+  }
+
+  // load ffmpeg on demand
+  loadBtn.addEventListener('click', async ()=>{
+    if (isFFmpegLoaded) return;
+    loadBtn.textContent = 'Loading FFmpeg…';
+    ffmpeg = createFFmpeg({ log: true, corePath: 'https://unpkg.com/@ffmpeg/core@0.11.1/dist/ffmpeg-core.js' });
+    ffmpeg.setProgress(({ ratio }) => setProgress(ratio || 0));
+    try {
+      await ffmpeg.load();
+      isFFmpegLoaded = true;
+      loadBtn.textContent = 'FFmpeg Ready';
+      loadBtn.disabled = true;
+    } catch (e) {
+      console.error(e);
+      alert('Failed to load FFmpeg in this browser.');
+      loadBtn.textContent = 'Load FFmpeg (retry)';
+    }
+  });
+
+  // file pick
+  pickBtn.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', e => handleFiles(e.target.files));
+  clearBtn.addEventListener('click', clearAll);
+
+  // drag drop
+  ;['dragenter','dragover'].forEach(ev=>dropzone.addEventListener(ev, e=> { e.preventDefault(); dropzone.classList.add('drag'); }));
+  ;['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev, e=> { e.preventDefault(); dropzone.classList.remove('drag'); }));
+  dropzone.addEventListener('drop', e => {
+    const f = e.dataTransfer.files;
+    handleFiles(f);
+  });
+
+  function humanBytes(b){
+    const u=['B','KB','MB','GB']; let i=0; let v=b; while(v>=1024 && i<u.length-1){v/=1024;i++} return (v.toFixed(v<10?2:0)+' '+u[i]);
+  }
+
+  function clearAll(){
+    selectedFile = null;
+    fileInput.value = '';
+    fileNameEl.textContent = 'No file chosen';
+    fileMetaEl.textContent = 'File info will appear here';
+    audioPlayer.style.display = 'none'; audioPlayer.src = '';
+    downloadLink.style.display = 'none';
+    playBtn.style.display = 'none';
+    setProgress(0);
+    if(lastBlobUrl){ URL.revokeObjectURL(lastBlobUrl); lastBlobUrl = null; }
+    initWave();
+    waveformContainer.innerHTML = 'No preview';
+  }
+
+  function handleFiles(files){
+    if(!files || files.length===0) return;
+    const f = files[0];
+    selectedFile = f;
+    fileNameEl.textContent = f.name;
+    fileMetaEl.textContent = `${f.type || 'unknown'} • ${humanBytes(f.size)}`;
+    // create quick audio preview using browser decode (first few seconds) if possible
+    tryLoadPreview(f);
+  }
+
+  async function tryLoadPreview(file){
+    // create object URL and try decode audio via HTMLAudioElement - browsers can play many container codecs
+    const url = URL.createObjectURL(file);
+    audioPlayer.src = url;
+    audioPlayer.style.display = 'block';
+    audioPlayer.load();
+    audioPlayer.onloadedmetadata = () => {
+      // set default trim end to duration
+      if (!endEl.value) endEl.value = (audioPlayer.duration || 0).toFixed(3);
+    };
+    // wavesurfer load
+    try {
+      wavesurfer.load(url);
+      playBtn.style.display = 'inline-block';
+      playBtn.textContent = 'Play Preview';
+      playBtn.onclick = () => { if(!wavesurfer.isPlaying()) wavesurfer.play(); else wavesurfer.pause(); };
+    } catch(e){
+      console.warn('Wave load failed', e);
+      waveformContainer.innerHTML = 'Preview not available';
+    }
+  }
+
+  // conversion
+  extractBtn.addEventListener('click', async ()=>{
+    if (!selectedFile) { alert('Select a video file first'); return; }
+    if (!isFFmpegLoaded) {
+      const ok = confirm('FFmpeg is not loaded. Load now? (required)');
+      if (!ok) return;
+      loadBtn.click();
+      // Wait for load - simple poll
+      let waited=0;
+      while(!isFFmpegLoaded && waited < 60000){
+        await new Promise(r=>setTimeout(r,300));
+        waited+=300;
+      }
+      if(!isFFmpegLoaded){ alert('FFmpeg failed to load. Try again.'); return; }
+    }
+
+    extractBtn.disabled = true;
+    extractBtn.textContent = 'Processing…';
+
+    const inName = 'input' + getExt(selectedFile.name);
+    const outExt = formatEl.value;
+    const outName = 'output.' + outExt;
+    const start = parseFloat(startEl.value) || 0;
+    const end = parseFloat(endEl.value) || 0;
+    // prepare ffmpeg FS
+    try {
+      setProgress(0.02);
+      const data = await fetchFile(selectedFile);
+      await ffmpeg.FS('writeFile', inName, data);
+
+      // build command
+      let cmd = ['-i', inName, '-vn']; // no video
+      // trim if specified (use -ss start -to end)
+      if (start > 0) cmd.push('-ss', String(start));
+      if (end > 0 && end > start) cmd.push('-to', String(end));
+      // output options by format
+      if (outExt === 'mp3') {
+        // use libmp3lame quality by bitrate
+        const br = qualityEl.value || '256k';
+        cmd.push('-b:a', br, outName);
+      } else if (outExt === 'wav') {
+        cmd.push('-ar','44100','-ac','2', outName);
+      } else if (outExt === 'aac') {
+        const br = qualityEl.value || '256k';
+        cmd.push('-c:a','aac','-b:a',br, outName);
+      } else if (outExt === 'flac') {
+        cmd.push('-c:a','flac', outName);
+      } else {
+        cmd.push(outName);
+      }
+
+      // run
+      await ffmpeg.run(...cmd); // ffmpeg.setProgress handles progress update
+      setProgress(0.85);
+
+      // read result
+      const outData = ffmpeg.FS('readFile', outName);
+      const blob = new Blob([outData.buffer], { type: mimeForExt(outExt) });
+      const blobUrl = URL.createObjectURL(blob);
+      if (lastBlobUrl) URL.revokeObjectURL(lastBlobUrl);
+      lastBlobUrl = blobUrl;
+
+      // prepare download
+      downloadLink.href = blobUrl;
+      downloadLink.download = `${stripExt(selectedFile.name)}.${outExt}`;
+      downloadLink.style.display = 'inline-block';
+      downloadLink.textContent = `Download ${outExt.toUpperCase()}`;
+
+      // load preview into audio player & waveform
+      audioPlayer.src = blobUrl;
+      audioPlayer.style.display = 'block';
+      audioPlayer.load();
+
+      // wavesurfer load
+      try {
+        wavesurfer.load(blobUrl);
+        playBtn.style.display = 'inline-block';
+        playBtn.onclick = () => { if(!wavesurfer.isPlaying()) wavesurfer.play(); else wavesurfer.pause(); };
+      } catch(e){ waveformContainer.innerHTML='Preview not available'; }
+
+      setProgress(1);
+      alert('Audio extraction finished — use Download button to save file.');
+    } catch (err) {
+      console.error(err);
+      alert('Conversion failed: ' + (err.message || err));
+    } finally {
+      extractBtn.disabled = false;
+      extractBtn.textContent = 'Extract Audio';
+      // cleanup FS (keep input for possible re-run)
+      try { ffmpeg.FS('unlink', outName); } catch(_) {}
+      setTimeout(()=>setProgress(0), 800);
+    }
+  });
+
+  // helper functions
+  function getExt(name){ const i = name.lastIndexOf('.'); return i>=0?name.slice(i):''; }
+  function stripExt(name){ const i = name.lastIndexOf('.'); return i>=0?name.slice(0,i):name; }
+  function mimeForExt(ext){ if(ext==='mp3') return 'audio/mpeg'; if(ext==='wav') return 'audio/wav'; if(ext==='aac') return 'audio/aac'; if(ext==='flac') return 'audio/flac'; return 'application/octet-stream'; }
+
+  // small safety: auto-load ffmpeg if user drags a file and hasn't loaded
+  dropzone.addEventListener('drop', async ()=> {
+    if (!isFFmpegLoaded) {
+      // try auto load but non-blocking
+      loadBtn.click();
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

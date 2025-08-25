@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickConvert - Advanced Image Editor</title>
+<link rel="icon" type="image/x-icon" href="arrow_13782286.icon">
+<style>
+body{
+  margin:0;
+  font-family: Arial, sans-serif;
+  background: #111;
+  color:#fff;
+}
+.wrap{
+  max-width:1200px;
+  margin:20px auto;
+  padding:10px;
+}
+header{
+  text-align:center;
+  margin-bottom:20px;
+}
+header h1{
+  color: #0ea5e9;
+}
+.panel{
+  background:#222;
+  border-radius:10px;
+  padding:15px;
+  margin-bottom:20px;
+}
+input, select, button{
+  padding:8px;
+  margin:5px 0;
+  border-radius:5px;
+  border:none;
+}
+button{
+  cursor:pointer;
+  background: linear-gradient(135deg,#0ea5e9,#2563eb);
+  color:#031028;
+  font-weight:700;
+}
+#canvas-container{
+  position:relative;
+  border:2px solid rgba(255,255,255,0.1);
+  border-radius:10px;
+  overflow:hidden;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:#111;
+  margin-bottom:10px;
+}
+canvas{
+  max-width:100%;
+  max-height:600px;
+  cursor:crosshair;
+}
+.emoji-thumb{
+  width:40px;
+  height:40px;
+  cursor:pointer;
+  margin:3px;
+  border:2px solid transparent;
+}
+.emoji-thumb.selected{
+  border-color:#0ea5e9;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>QuickConvert Advanced Image Editor</h1>
+    <p>Upload image, add multiple emojis/images manually, crop background, apply filters & download.</p>
+  </header>
+
+  <!-- Upload main image -->
+  <div class="panel">
+    <input type="file" id="main-upload" accept="image/*">
+    <button id="download-btn">Download Final Image</button>
+  </div>
+
+  <!-- Canvas -->
+  <div class="panel">
+    <div id="canvas-container">
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="panel">
+    <h3>Filters</h3>
+    <label>Brightness: <input type="range" id="brightness" min="0" max="200" value="100"></label>
+    <label>Contrast: <input type="range" id="contrast" min="0" max="200" value="100"></label>
+    <label>Saturation: <input type="range" id="saturation" min="0" max="200" value="100"></label>
+    <button id="apply-filters">Apply Filters</button>
+  </div>
+
+  <!-- Emoji/Image Panel -->
+  <div class="panel">
+    <h3>Add Emoji / Small Images (click to select)</h3>
+    <input type="file" id="emoji-upload" accept="image/*" multiple>
+    <div id="emoji-list"></div>
+    <p>Click on canvas to place selected emoji/image</p>
+  </div>
+
+  <!-- Background Remove / Transparent -->
+  <div class="panel">
+    <h3>Background Remove / Crop</h3>
+    <button id="remove-bg-btn">Remove Background (basic)</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let mainImage = new Image();
+let filterSettings = {brightness:100, contrast:100, saturation:100};
+let emojiImages = [];
+let selectedEmoji = null;
+
+// Draw main image with filters
+function drawMainImage(){
+  if(!mainImage.src) return;
+  canvas.width = mainImage.width;
+  canvas.height = mainImage.height;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.filter = `brightness(${filterSettings.brightness}%) contrast(${filterSettings.contrast}%) saturate(${filterSettings.saturation}%)`;
+  ctx.drawImage(mainImage,0,0);
+  // Draw emojis on top
+  emojiImages.forEach(e=>{
+    ctx.drawImage(e.img,e.x,e.y,e.width,e.height);
+  });
+}
+
+// Main image upload
+document.getElementById('main-upload').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(file){
+    const url = URL.createObjectURL(file);
+    mainImage.onload = ()=> drawMainImage();
+    mainImage.src = url;
+  }
+});
+
+// Apply filters
+document.getElementById('apply-filters').addEventListener('click', ()=>{
+  filterSettings.brightness = document.getElementById('brightness').value;
+  filterSettings.contrast = document.getElementById('contrast').value;
+  filterSettings.saturation = document.getElementById('saturation').value;
+  drawMainImage();
+});
+
+// Emoji upload
+document.getElementById('emoji-upload').addEventListener('change', e=>{
+  const files = e.target.files;
+  const emojiList = document.getElementById('emoji-list');
+  for(let file of files){
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.src = url;
+    img.onload = ()=>{
+      const thumb = document.createElement('img');
+      thumb.src = url;
+      thumb.className='emoji-thumb';
+      thumb.addEventListener('click', ()=> {
+        document.querySelectorAll('.emoji-thumb').forEach(el=>el.classList.remove('selected'));
+        thumb.classList.add('selected');
+        selectedEmoji = img;
+      });
+      emojiList.appendChild(thumb);
+    };
+  }
+});
+
+// Place emoji on canvas
+canvas.addEventListener('click', e=>{
+  if(selectedEmoji){
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left - selectedEmoji.width/4;
+    const y = e.clientY - rect.top - selectedEmoji.height/4;
+    emojiImages.push({img:selectedEmoji,x,y,width:50,height:50});
+    drawMainImage();
+  }
+});
+
+// Download final image
+document.getElementById('download-btn').addEventListener('click',()=>{
+  const link = document.createElement('a');
+  link.download = 'edited-image.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+// Basic background remove (set pixels close to white to transparent)
+document.getElementById('remove-bg-btn').addEventListener('click', ()=>{
+  const imageData = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const data = imageData.data;
+  for(let i=0;i<data.length;i+=4){
+    const r = data[i];
+    const g = data[i+1];
+    const b = data[i+2];
+    if(r>200 && g>200 && b>200){ // simple white bg remove
+      data[i+3]=0;
+    }
+  }
+  ctx.putImageData(imageData,0,0);
+});
+</script>
+</body>
+</html>

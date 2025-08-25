@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QuickConvert — Instant Image Format Converter</title>
+  <link rel="icon" type="image/x-icon" href="arrow_13782286.icon">
+  <style>
+    :root {
+      --bg: #0f1220;
+      --panel: #151939;
+      --soft: #1e234b;
+      --text: #ecf0ff;
+      --muted: #aeb7e1;
+      --accent: #6ea8ff;
+      --accent-2: #8ef0c6;
+      --danger: #ff6b6b;
+      --ok: #9be07b;
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #18204a 0%, var(--bg) 60%), var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 28px 20px; position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(8px);
+      background: linear-gradient(180deg, rgba(21,25,57,.85), rgba(21,25,57,.35));
+      border-bottom: 1px solid #2a2f63;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-weight: 800; letter-spacing: .2px; }
+    .tag { color: var(--muted); font-size: 14px; }
+
+    .panel {
+      background: linear-gradient(180deg, var(--panel), #101433);
+      border: 1px solid #2a2f63; border-radius: var(--radius);
+      box-shadow: 0 20px 40px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .uploader { margin: 24px 0; padding: 18px; display: grid; gap: 14px; }
+    .dropzone {
+      border: 2px dashed #3a4286; border-radius: var(--radius);
+      padding: 28px; text-align: center; transition: .2s;
+      background: linear-gradient(180deg, var(--soft), #111843);
+    }
+    .dropzone.dragover { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(110,168,255,.2) inset; transform: translateY(-1px); }
+    .dropzone input { display: none; }
+    .dropzone .big { font-size: 18px; font-weight: 700; }
+    .dropzone .hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+    .controls { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; align-items: end; }
+    .field { background: #0f1436; border: 1px solid #2a2f63; border-radius: 14px; padding: 12px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    select, input[type="number"], input[type="text"], input[type="color"], input[type="range"] {
+      width: 100%; background: #0c1131; color: var(--text); border: 1px solid #2a2f63; border-radius: 12px; padding: 10px 12px; outline: none;
+    }
+    button {
+      appearance: none; border: none; border-radius: 14px; padding: 12px 16px; font-weight: 800; letter-spacing: .2px; cursor: pointer;
+      background: linear-gradient(180deg, #538dff, #3b6be8); color: #03143b; box-shadow: 0 12px 24px rgba(83,141,255,.25);
+    }
+    button.secondary { background: linear-gradient(180deg, #2b305f, #232750); color: #cfd6ff; box-shadow: none; border: 1px solid #2a2f63; }
+
+    .results { margin: 20px 0 40px; padding: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .card { background: #0e1438; border: 1px solid #2a2f63; border-radius: 16px; padding: 12px; display: grid; gap: 8px; }
+    .thumb { aspect-ratio: 1.3/1; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: #0b0f2b; border: 1px dashed #2a2f63; }
+    .thumb img { max-width: 100%; max-height: 180px; display: block; }
+    .meta { font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
+    .chip { display: inline-block; font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid #39408a; background: #0b1033; color: #cfd6ff; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .danger { color: var(--danger); }
+
+    footer { color: var(--muted); font-size: 12px; padding: 20px; text-align: center; }
+    .note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>QuickConvert</h1>
+      <div class="tag">Convert PNG ⇆ JPG • WEBP • SVG → PNG/JPG • BMP → PNG/JPG • PNG/JPG → ICO • ICO → PNG*</div>
+      <div class="note">*ICO → PNG works in most modern browsers. If an .ico fails to preview, try a different icon or size.</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel uploader">
+      <div id="dropzone" class="dropzone">
+        <label for="file-input" class="big">Drag & Drop images here, or <u>click to select</u></label>
+        <div class="hint">Supported: PNG, JPG, JPEG, WEBP, SVG, BMP, ICO</div>
+        <input id="file-input" type="file" accept="image/*,.ico,.svg,.bmp" multiple />
+      </div>
+
+      <div class="controls">
+        <div class="field" style="grid-column: span 3; min-width: 200px;">
+          <label>Convert to</label>
+          <select id="target-format">
+            <option value="auto">Auto (smart)</option>
+            <option value="png">PNG</option>
+            <option value="jpg">JPG</option>
+            <option value="webp">WEBP</option>
+            <option value="ico">ICO</option>
+          </select>
+        </div>
+
+        <div id="jpg-controls" class="field hidden" style="grid-column: span 3; min-width: 180px;">
+          <label>JPG Quality <span id="quality-val">0.92</span></label>
+          <input id="quality" type="range" min="0.1" max="1" step="0.01" value="0.92" />
+          <div class="note">Higher = bigger file</div>
+        </div>
+
+        <div id="bg-controls" class="field hidden" style="grid-column: span 3; min-width: 180px;">
+          <label>Background for JPG/WebP (fills transparent)</label>
+          <input id="bg-color" type="color" value="#0b102e" />
+        </div>
+
+        <div id="ico-controls" class="field hidden" style="grid-column: span 3; min-width: 200px;">
+          <label>ICO Size</label>
+          <select id="ico-size">
+            <option value="16">16×16</option>
+            <option value="32">32×32</option>
+            <option value="48">48×48</option>
+            <option value="64">64×64</option>
+            <option value="128">128×128</option>
+            <option value="256" selected>256×256</option>
+          </select>
+          <div class="note">PNG-compressed ICO (Windows & modern browsers)</div>
+        </div>
+
+        <div style="grid-column: span 12; display:flex; gap:10px; flex-wrap: wrap;">
+          <button id="convert-btn">Convert Now</button>
+          <button id="clear-btn" class="secondary" type="button">Clear</button>
+          <button id="download-all" class="secondary" type="button">Download All</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel results">
+      <div class="row" style="justify-content: space-between; padding: 6px 6px 0;">
+        <div class="tag">Results</div>
+        <div class="tag">Tip: You can mix formats. We'll auto-pick smart defaults per file when "Auto" is selected.</div>
+      </div>
+      <div id="results" class="grid" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer>
+    100% client-side • No uploads • No watermarks
+  </footer>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const targetFormatEl = document.getElementById('target-format');
+    const resultsEl = document.getElementById('results');
+    const convertBtn = document.getElementById('convert-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const downloadAllBtn = document.getElementById('download-all');
+    const jpgControls = document.getElementById('jpg-controls');
+    const qualityEl = document.getElementById('quality');
+    const qualityVal = document.getElementById('quality-val');
+    const bgControls = document.getElementById('bg-controls');
+    const bgColorEl = document.getElementById('bg-color');
+    const icoControls = document.getElementById('ico-controls');
+    const icoSizeEl = document.getElementById('ico-size');
+
+    let queuedFiles = [];
+
+    function setControlsVisibility() {
+      const fmt = targetFormatEl.value;
+      jpgControls.classList.toggle('hidden', !(fmt === 'jpg' || fmt === 'webp'));
+      bgControls.classList.toggle('hidden', !(fmt === 'jpg' || fmt === 'webp'));
+      icoControls.classList.toggle('hidden', fmt !== 'ico');
+    }
+
+    targetFormatEl.addEventListener('change', setControlsVisibility);
+    qualityEl.addEventListener('input', () => qualityVal.textContent = Number(qualityEl.value).toFixed(2));
+
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    ;['dragenter','dragover'].forEach(evt => dropzone.addEventListener(evt, e => {
+      e.preventDefault(); e.stopPropagation(); dropzone.classList.add('dragover');
+    }));
+    ;['dragleave','drop'].forEach(evt => dropzone.addEventListener(evt, e => {
+      e.preventDefault(); e.stopPropagation(); dropzone.classList.remove('dragover');
+    }));
+    dropzone.addEventListener('drop', e => {
+      handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+    function handleFiles(fileList) {
+      for (const file of fileList) {
+        if (!isSupported(file)) { toast(`Unsupported: ${file.name}`, true); continue; }
+        queuedFiles.push(file);
+        renderQueueCard(file);
+      }
+      if (queuedFiles.length) window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    function isSupported(file) {
+      const ext = extOf(file.name).toLowerCase();
+      const types = ['png','jpg','jpeg','webp','svg','bmp','ico'];
+      return types.includes(ext);
+    }
+
+    function extOf(name) {
+      const i = name.lastIndexOf('.');
+      return i >= 0 ? name.slice(i+1) : '';
+    }
+
+    function baseName(name) {
+      const i = name.lastIndexOf('.');
+      return i >= 0 ? name.slice(0, i) : name;
+    }
+
+    function renderQueueCard(file) {
+      const id = crypto.randomUUID();
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.innerHTML = `
+        <div class="thumb"><span class="chip">Queued</span></div>
+        <div class="meta">
+          <div><strong>${escapeHtml(file.name)}</strong></div>
+          <div class="row"><span class="chip">${humanBytes(file.size)}</span><span class="chip">${file.type || extOf(file.name).toUpperCase()}</span></div>
+          <div class="note">Ready to convert → <span class="chip">${targetFormatEl.value.toUpperCase()}</span></div>
+        </div>`;
+      resultsEl.prepend(card);
+      // Preview
+      const img = document.createElement('img');
+      const url = URL.createObjectURL(file);
+      img.onload = () => URL.revokeObjectURL(url);
+      img.src = url;
+      const th = card.querySelector('.thumb');
+      th.innerHTML = '';
+      th.appendChild(img);
+    }
+
+    function toast(msg, isErr=false) {
+      const div = document.createElement('div');
+      div.textContent = msg;
+      div.style.position = 'fixed'; div.style.bottom = '16px'; div.style.left = '50%'; div.style.transform = 'translateX(-50%)';
+      div.style.padding = '10px 14px'; div.style.borderRadius = '12px'; div.style.zIndex = 99;
+      div.style.background = isErr ? '#3a1120' : '#0f2d22';
+      div.style.border = `1px solid ${isErr ? '#a93355' : '#238b66'}`;
+      div.style.color = '#fff';
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 2600);
+    }
+
+    async function convertAll() {
+      if (!queuedFiles.length) { toast('Add some files first'); return; }
+      const target = targetFormatEl.value;
+      convertBtn.disabled = true; convertBtn.textContent = 'Converting…';
+      try {
+        for (const file of [...queuedFiles]) {
+          try {
+            const res = await convertFile(file, target);
+            if (res) addResultCard(file, res.blob, res.ext, res.extraNote);
+          } catch (err) {
+            console.error(err);
+            addErrorCard(file, String(err));
+          }
+        }
+        toast('Done');
+      } finally {
+        convertBtn.disabled = false; convertBtn.textContent = 'Convert Now';
+      }
+    }
+
+    convertBtn.addEventListener('click', convertAll);
+
+    clearBtn.addEventListener('click', () => {
+      queuedFiles = []; resultsEl.innerHTML = '';
+      fileInput.value = '';
+      toast('Cleared');
+    });
+
+    downloadAllBtn.addEventListener('click', () => {
+      const links = resultsEl.querySelectorAll('a[data-download]');
+      let i = 0;
+      function step() {
+        if (i >= links.length) return;
+        links[i].click(); i++; setTimeout(step, 250);
+      }
+      step();
+    });
+
+    async function convertFile(file, target) {
+      const srcExt = extOf(file.name).toLowerCase();
+      const autoMap = { svg: 'png', bmp: 'png', ico: 'png' };
+      const dest = target === 'auto' ? (autoMap[srcExt] || (srcExt === 'png' ? 'jpg' : 'png')) : target;
+
+      if (dest === 'ico') {
+        // Create ICO from rasterized image at requested size
+        const size = parseInt(icoSizeEl.value, 10) || 256;
+        const imgBitmap = await fileToImageBitmap(file);
+        const canvas = new OffscreenCanvas(size, size);
+        const ctx = canvas.getContext('2d');
+        // Fit cover
+        const scale = Math.max(size / imgBitmap.width, size / imgBitmap.height);
+        const w = imgBitmap.width * scale; const h = imgBitmap.height * scale;
+        ctx.drawImage(imgBitmap, (size - w)/2, (size - h)/2, w, h);
+        const pngBlob = await canvas.convertToBlob({ type: 'image/png' });
+        const icoBlob = await pngBlobToIco(pngBlob);
+        return { blob: icoBlob, ext: 'ico', extraNote: `${size}×${size}` };
+      }
+
+      if (dest === 'png' || dest === 'jpg' || dest === 'webp') {
+        // Try to draw via ImageBitmap, which can handle most formats (incl. ico in many browsers)
+        const imgBitmap = await fileToImageBitmap(file);
+        const canvas = new OffscreenCanvas(imgBitmap.width, imgBitmap.height);
+        const ctx = canvas.getContext('2d');
+        if ((dest === 'jpg' || dest === 'webp') && hasAlpha(imgBitmap)) {
+          ctx.fillStyle = bgColorEl.value || '#0b102e';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else {
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+        }
+        ctx.drawImage(imgBitmap, 0, 0);
+        const opts = (dest === 'jpg' || dest === 'webp') ? { quality: Number(qualityEl.value) } : {};
+        const mime = dest === 'jpg' ? 'image/jpeg' : (dest === 'webp' ? 'image/webp' : 'image/png');
+        const blob = await canvas.convertToBlob({ type: mime, ...opts });
+        return { blob, ext: dest };
+      }
+
+      throw new Error('Unsupported target format: ' + dest);
+    }
+
+    function hasAlpha(bitmap) {
+      // Heuristic: assume source may have alpha for png/webp/ico/svg; for jpg/bmp usually no alpha.
+      return true;
+    }
+
+    async function fileToImageBitmap(file) {
+      // For SVG we should rasterize at natural size; browsers pick a default (e.g., 300x150) if not specified.
+      // We'll set a large width for crisp results then scale down on export if needed by target (e.g., ICO step handles size).
+      if (extOf(file.name).toLowerCase() === 'svg') {
+        const text = await file.text();
+        // Ensure width/height for reliable rasterization
+        const injected = text.includes('width=') || text.includes('height=') ? text : text.replace('<svg', '<svg width="1024" height="1024"');
+        const blob = new Blob([injected], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const img = await loadImage(url);
+        URL.revokeObjectURL(url);
+        return createImageBitmap(img);
+      }
+      // Other formats directly
+      return await createImageBitmap(file);
+    }
+
+    function loadImage(url) {
+      return new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = () => rej(new Error('Failed to load image'));
+        img.src = url;
+      });
+    }
+
+    function humanBytes(bytes) {
+      const units = ['B','KB','MB','GB'];
+      let i = 0; let v = bytes;
+      while (v >= 1024 && i < units.length-1) { v /= 1024; i++; }
+      return `${v.toFixed(v < 10 && i > 0 ? 2 : 0)} ${units[i]}`;
+    }
+
+    function escapeHtml(s){ return s.replace(/[&<>"]+/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    function addErrorCard(file, message) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="thumb"><span class="chip danger">Error</span></div>
+        <div class="meta">
+          <div><strong>${escapeHtml(file.name)}</strong></div>
+          <div class="danger">${escapeHtml(message)}</div>
+        </div>`;
+      resultsEl.prepend(card);
+    }
+
+    function addResultCard(srcFile, blob, ext, extraNote) {
+      const url = URL.createObjectURL(blob);
+      const card = document.createElement('div');
+      card.className = 'card';
+      const nameOut = `${baseName(srcFile.name)}.${ext}`;
+      card.innerHTML = `
+        <div class="thumb">${ext === 'ico' ? '<span class="chip">ICO Preview*</span>' : `<img alt="preview" src="${url}">`}</div>
+        <div class="meta">
+          <div><strong>${escapeHtml(nameOut)}</strong></div>
+          <div class="row">
+            <span class="chip">${ext.toUpperCase()}</span>
+            <span class="chip">${humanBytes(blob.size)}</span>
+            ${extraNote ? `<span class="chip">${escapeHtml(extraNote)}</span>` : ''}
+          </div>
+          ${ext === 'ico' ? '<div class="note">*Some browsers do not render ICO previews. File will still download correctly.</div>' : ''}
+        </div>
+        <div class="row">
+          <a data-download download="${nameOut}" href="${url}"><button>Download</button></a>
+          <button class="secondary" type="button">Reveal in new tab</button>
+        </div>`;
+      const btns = card.querySelectorAll('button');
+      btns[1].addEventListener('click', () => window.open(url, '_blank'));
+      resultsEl.prepend(card);
+    }
+
+    // === PNG -> ICO (single image, PNG-compressed) ===
+    async function pngBlobToIco(pngBlob) {
+      const pngBuf = new Uint8Array(await pngBlob.arrayBuffer());
+      // ICO header (ICONDIR)
+      const ICONDIR = new Uint8Array(6);
+      ICONDIR[0] = 0; ICONDIR[1] = 0;      // reserved
+      ICONDIR[2] = 1; ICONDIR[3] = 0;      // type: 1 = icon
+      ICONDIR[4] = 1; ICONDIR[5] = 0;      // count: 1 image
+
+      // Read PNG to get width/height
+      // PNG IHDR at fixed position after 8-byte signature: [8..8+25]
+      const dv = new DataView(pngBuf.buffer);
+      const width = dv.getUint32(16); // big-endian by spec
+      const height = dv.getUint32(20);
+      const wByte = (width === 256) ? 0 : Math.min(width, 255);
+      const hByte = (height === 256) ? 0 : Math.min(height, 255);
+
+      // ICONDIRENTRY (16 bytes)
+      const entry = new Uint8Array(16);
+      entry[0] = wByte;                 // width
+      entry[1] = hByte;                 // height
+      entry[2] = 0;                     // color count (0 if >= 8bpp)
+      entry[3] = 0;                     // reserved
+      entry[4] = 1; entry[5] = 0;       // color planes
+      entry[6] = 32; entry[7] = 0;      // bit count
+      const bytesInRes = pngBuf.length;
+      // size (little endian)
+      entry[8]  = bytesInRes & 0xFF;
+      entry[9]  = (bytesInRes >> 8) & 0xFF;
+      entry[10] = (bytesInRes >> 16) & 0xFF;
+      entry[11] = (bytesInRes >> 24) & 0xFF;
+      const offset = 6 + 16; // header + one entry
+      entry[12] = offset & 0xFF;
+      entry[13] = (offset >> 8) & 0xFF;
+      entry[14] = (offset >> 16) & 0xFF;
+      entry[15] = (offset >> 24) & 0xFF;
+
+      const out = new Uint8Array(offset + pngBuf.length);
+      out.set(ICONDIR, 0);
+      out.set(entry, 6);
+      out.set(pngBuf, offset);
+      return new Blob([out], { type: 'image/x-icon' });
+    }
+
+    // Initialize
+    setControlsVisibility();
+  </script>
+</body>
+</html>
